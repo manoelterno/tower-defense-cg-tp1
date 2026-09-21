@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trabalho Prático 1 - Tower Defense</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <!-- O Canvas onde o WebGL2 vai renderizar os gráficos -->
+        <canvas id="gameCanvas" width="900" height="600"></canvas>
+        
+        <!-- HUD sobreposto ao canvas -->
+        <div id="hud">
+            <span id="hp-display">Torre HP: 100</span>
+            <span id="score-display">Pontuação: 0</span>
+        </div>
+    </div>
+    <script src="main.js"></script>
+</body>
+</html>
