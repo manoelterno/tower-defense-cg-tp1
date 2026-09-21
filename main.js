@@ -1,6 +1,18 @@
 let gl; 
 let logoAntes = 0;
-let minhaTextura = null; 
+let texFundo = null;
+let texTorre = null;
+let texInimigo = null;
+let localDeslocamento = null;
+let localEscala = null;
+
+// Variáveis de estado do jogo
+const torre = {
+  x: 0.0,
+  y: 0.0
+};
+const inimigos = [];
+let tempoParaSpawn = 0;
 
 function mouseMexeu(evento) {}
 function mouseClicou(evento) {}
@@ -36,14 +48,19 @@ function configuraTudo() {
   canvas.addEventListener('click', mouseClicou);
   document.addEventListener('keydown', teclaPressionada);
   
-  // 3. SHADERS ATUALIZADOS PARA SUPORTAR TEXTURAS
+  // 3. SHADERS ATUALIZADOS PARA SUPORTAR TEXTURAS E TRANSFORMAÇÕES
   const vertexShaderSource = `#version 300 es
 in vec2 a_posicao;
 in vec2 a_coordsTex;     // Coordenadas UV vindas do JS
+
+uniform vec2 u_deslocamento;
+uniform vec2 u_escala;
+
 out vec2 v_coordsTex;    // Passa para o Fragment Shader
 
 void main() {
-  gl_Position = vec4(a_posicao, 0.0, 1.0); 
+  vec2 posicaoFinal = (a_posicao * u_escala) + u_deslocamento;
+  gl_Position = vec4(posicaoFinal, 0.0, 1.0); 
   v_coordsTex = a_coordsTex;
 }`;
 
@@ -112,39 +129,116 @@ void main() {
   glContext.enableVertexAttribArray(localTex);
   glContext.vertexAttribPointer(localTex, 2, glContext.FLOAT, false, 0, 0);
 
-  // CARREGAR A IMAGEM NO JAVASCRIPT E ENVIAR PARA A GPU
-  minhaTextura = glContext.createTexture();
-  glContext.bindTexture(glContext.TEXTURE_2D, minhaTextura);
+  // Resgata a localização dos Uniforms para translação e escala
+  localDeslocamento = glContext.getUniformLocation(programa, "u_deslocamento");
+  localEscala = glContext.getUniformLocation(programa, "u_escala");
 
-  // Coloca provisoriamente um pixel azul enquanto a imagem real não carrega
-  glContext.texImage2D(glContext.TEXTURE_2D, 0, glContext.RGBA, 1, 1, 0, glContext.RGBA, glContext.UNSIGNED_BYTE, new Uint8Array([0, 0, 255, 255]));
-
-  const imagem = new Image();
-  imagem.src = 'assets/soldier.png'; 
-  imagem.onload = function() {
-    
-    // deixa transparente o fundo da imagem
-      glContext.enable(glContext.BLEND);
-      glContext.blendFunc(glContext.SRC_ALPHA, glContext.ONE_MINUS_SRC_ALPHA);
-      glContext.bindTexture(glContext.TEXTURE_2D, minhaTextura);
-      glContext.pixelStorei(glContext.UNPACK_FLIP_Y_WEBGL, true);
-      // Envia os pixels da imagem HTML para o objeto de textura do WebGL
-      glContext.texImage2D(glContext.TEXTURE_2D, 0, glContext.RGBA, glContext.RGBA, glContext.UNSIGNED_BYTE, imagem);
-      
-      // Como imagens da Web geralmente seguem padrões de tamanho variados, geramos os Mipmaps
-      glContext.generateMipmap(glContext.TEXTURE_2D);
-  };
+  // CARREGAR AS TEXTURAS USANDO A FUNÇÃO UTILITÁRIA
+  texFundo = carregarTextura(glContext, 'assets/fundo.png');
+  texTorre = carregarTextura(glContext, 'assets/torre.png');
+  texInimigo = carregarTextura(glContext, 'assets/soldier.png');
 
   // 5. Inicia valores de estado
   glContext.clearColor(0.2, 0.2, 0.2, 1); 
   glContext.useProgram(programa);         
   glContext.bindVertexArray(vao);         
 
+  // Define valores iniciais padrão para não distorcer ou zerar a geometria
+  glContext.uniform2f(localDeslocamento, 0.0, 0.0);
+  glContext.uniform2f(localEscala, 1.0, 1.0);
+
   return glContext;
 }
 
-function atualizaLogica(quantoTempo) {
-  // Lógica de jogo
+function carregarTextura(gl, url) {
+  const textura = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, textura);
+
+  // Coloca provisoriamente um pixel azul enquanto a imagem real não carrega
+  gl.texImage2D(
+    gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0,
+    gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 255, 255])
+  );
+
+  const imagem = new Image();
+  imagem.onload = function() {
+    // Configurações de transparência (BLEND)
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+    // Inversão do eixo Y para coincidir com as coordenadas UV do WebGL
+    gl.bindTexture(gl.TEXTURE_2D, textura);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+
+    // Envia os pixels da imagem para o objeto de textura na GPU
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imagem);
+    gl.generateMipmap(gl.TEXTURE_2D);
+  };
+  imagem.onerror = function() {
+    console.warn(`Não foi possível carregar a imagem da textura em: ${url}`);
+  };
+  imagem.src = url;
+
+  return textura;
+}
+
+function atualizaLogica(quantoPassou) {
+  // 1. Spawner de inimigos nas bordas da tela a cada 2 segundos
+  tempoParaSpawn += quantoPassou;
+  if (tempoParaSpawn >= 2.0) {
+    tempoParaSpawn -= 2.0;
+
+    let x = 0;
+    let y = 0;
+    const borda = Math.floor(Math.random() * 4);
+
+    switch (borda) {
+      case 0: // Borda Superior
+        x = Math.random() * 2.0 - 1.0;
+        y = 1.1;
+        break;
+      case 1: // Borda Inferior
+        x = Math.random() * 2.0 - 1.0;
+        y = -1.1;
+        break;
+      case 2: // Borda Esquerda
+        x = -1.1;
+        y = Math.random() * 2.0 - 1.0;
+        break;
+      case 3: // Borda Direita
+        x = 1.1;
+        y = Math.random() * 2.0 - 1.0;
+        break;
+    }
+
+    inimigos.push({
+      x: x,
+      y: y,
+      velocidade: 0.3 // Velocidade em unidades NDC por segundo
+    });
+  }
+
+  // 2. Movimentação vetorial dos inimigos em direção à torre (0, 0)
+  for (let i = 0; i < inimigos.length; i++) {
+    const inimigo = inimigos[i];
+
+    // Vetor direção do inimigo até a torre
+    const dx = torre.x - inimigo.x;
+    const dy = torre.y - inimigo.y;
+
+    // Distância euclidiana (módulo do vetor)
+    const distancia = Math.hypot(dx, dy);
+
+    // Normalização do vetor (apenas se não estiver já na torre)
+    if (distancia > 0.001) {
+      const dirX = dx / distancia;
+      const dirY = dy / distancia;
+
+      // Deslocamento proporcional à velocidade e ao tempo decorrido
+      inimigo.x += dirX * inimigo.velocidade * quantoPassou;
+      inimigo.y += dirY * inimigo.velocidade * quantoPassou;
+    }
+  }
 }
 
 function desenhaCena(gl) {
@@ -152,9 +246,26 @@ function desenhaCena(gl) {
 
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  // Ativa a unidade de textura 0 e desenha
   gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, minhaTextura);
 
+  // 1) O Fundo (posicionado no centro com escala para cobrir a tela de -1 a 1)
+  gl.bindTexture(gl.TEXTURE_2D, texFundo);
+  gl.uniform2f(localDeslocamento, 0.0, 0.0);
+  gl.uniform2f(localEscala, 5.0, 5.0);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+  // 2) A Torre (posicionada no centro)
+  gl.bindTexture(gl.TEXTURE_2D, texTorre);
+  gl.uniform2f(localDeslocamento, torre.x, torre.y);
+  gl.uniform2f(localEscala, 1.0, 1.0);
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+  // 3) Todos os inimigos do array
+  gl.bindTexture(gl.TEXTURE_2D, texInimigo);
+  for (let i = 0; i < inimigos.length; i++) {
+    const inimigo = inimigos[i];
+    gl.uniform2f(localDeslocamento, inimigo.x, inimigo.y);
+    gl.uniform2f(localEscala, 0.5, 0.5);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+  }
 }
