@@ -21,6 +21,7 @@ const projeteis = [];
 let tempoParaSpawn = 0;
 let tempoParaTiro = 0;
 let pontuacao = 0;
+let vida = 100;
 
 function mouseMexeu(evento) {}
 
@@ -29,6 +30,14 @@ function pontuacaoAtualizada() {
   const elementoPontuacao = document.getElementById('score-display');
   if (elementoPontuacao) {
     elementoPontuacao.textContent = `Pontuação: ${pontuacao}`;
+  }
+}
+
+function vidaAtualizada() {
+  vida = vida - 10;
+  const elementoVida = document.getElementById('hp-display');
+  if (elementoVida) {
+    elementoVida.textContent = `Torre HP: ${vida}`;
   }
 }
 
@@ -318,6 +327,24 @@ function atualizaLogica(quantoPassou) {
       // Deslocamento proporcional à velocidade e ao tempo decorrido
       inimigo.x += dirX * inimigo.velocidade * quantoPassou;
       inimigo.y += dirY * inimigo.velocidade * quantoPassou;
+    }
+  }
+
+// 2.5 Verifica colisão entre inimigos e torre, aplicando dano à torre se necessário
+  for (let i = inimigos.length - 1; i >= 0; i--) {
+    const inimigo = inimigos[i];
+
+    if (inimigo.morto) continue;
+
+    const dx = inimigo.x - torre.x;
+    const dy = inimigo.y - torre.y;
+    const distancia = Math.hypot(dx, dy);
+
+    // ajuste esse valor conforme o tamanho visual da torre/inimigo
+    if (distancia < 0.15) {
+      inimigos.splice(i, 1); // remove o inimigo ao encostar na torre
+      vidaAtualizada();       // chama a função de dano
+      break;                 // evita repetir o dano no mesmo frame
     }
   }
 
