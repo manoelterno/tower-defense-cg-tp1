@@ -3,6 +3,7 @@ let logoAntes = 0;
 let texFundo = null;
 let texTorre = null;
 let texInimigo = null;
+let texProjetil = null;
 let localDeslocamento = null;
 let localEscala = null;
 
@@ -12,10 +13,42 @@ const torre = {
   y: 0.0
 };
 const inimigos = [];
+const projeteis = [];
 let tempoParaSpawn = 0;
+let tempoParaTiro = 0;
 
 function mouseMexeu(evento) {}
-function mouseClicou(evento) {}
+
+function mouseClicou(evento) {
+  const canvas = document.getElementById('gameCanvas') || evento.target;
+  const rect = canvas.getBoundingClientRect();
+
+  // 1. Coordenadas do clique relativas ao Canvas (espaço de tela em pixels: [0, 0] no topo-esquerdo)
+  const pixelX = evento.clientX - rect.left;
+  const pixelY = evento.clientY - rect.top;
+
+  // 2. Conversão para NDC WebGL:
+  // Eixo X: [0, rect.width]  -> [-1, 1]
+  // Eixo Y: [0, rect.height] -> [1, -1] (inverte o eixo Y pois no WebGL +1 é o topo e -1 é a base)
+  const ndcX = (pixelX / rect.width) * 2.0 - 1.0;
+  const ndcY = 1.0 - (pixelY / rect.height) * 2.0;
+
+  // 3. Disparo manual do jogador: cria um projétil que sai da torre em direção ao ponto clicado
+  const dx = ndcX - torre.x;
+  const dy = ndcY - torre.y;
+  const dist = Math.hypot(dx, dy);
+
+  if (dist > 0.001) {
+    projeteis.push({
+      x: torre.x,
+      y: torre.y,
+      dirX: dx / dist,
+      dirY: dy / dist,
+      velocidade: 1.5 // Projétil do jogador é rápido e responsivo
+    });
+  }
+}
+
 function teclaPressionada(evento) {}
 
 window.onload = () => {
@@ -137,6 +170,7 @@ void main() {
   texFundo = carregarTextura(glContext, 'assets/fundo.png');
   texTorre = carregarTextura(glContext, 'assets/torre.png');
   texInimigo = carregarTextura(glContext, 'assets/soldier.png');
+  texProjetil = carregarTextura(glContext, 'assets/projetil.png');
 
   // 5. Inicia valores de estado
   glContext.clearColor(0.2, 0.2, 0.2, 1); 
@@ -239,6 +273,32 @@ function atualizaLogica(quantoPassou) {
       inimigo.y += dirY * inimigo.velocidade * quantoPassou;
     }
   }
+
+  // 3. Atualização da posição de cada projétil no espaço
+  for (let i = projeteis.length - 1; i >= 0; i--) {
+    const p = projeteis[i];
+    p.x += p.dirX * p.velocidade * quantoPassou;
+    p.y += p.dirY * p.velocidade * quantoPassou;
+
+    // Descarta projéteis que saíram dos limites da tela visível
+    if (Math.abs(p.x) > 1.5 || Math.abs(p.y) > 1.5) {
+      projeteis.splice(i, 1);
+      continue;
+    }
+
+    // 5. Detecção de colisão em formato de círculo (raio de colisão < 0.1)
+    for (let j = inimigos.length - 1; j >= 0; j--) {
+      const inimigo = inimigos[j];
+      const distancia = Math.hypot(p.x - inimigo.x, p.y - inimigo.y);
+
+      if (distancia < 0.1) {
+        // Colisão detectada: remove o projétil e o inimigo dos respectivos arrays
+        projeteis.splice(i, 1);
+        inimigos.splice(j, 1);
+        break; // O projétil foi destruído, encerra a busca para este projétil
+      }
+    }
+  }
 }
 
 function desenhaCena(gl) {
@@ -266,6 +326,15 @@ function desenhaCena(gl) {
     const inimigo = inimigos[i];
     gl.uniform2f(localDeslocamento, inimigo.x, inimigo.y);
     gl.uniform2f(localEscala, 0.5, 0.5);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+  }
+
+  // 4) Todos os projéteis do array
+  gl.bindTexture(gl.TEXTURE_2D, texProjetil);
+  for (let i = 0; i < projeteis.length; i++) {
+    const projetil = projeteis[i];
+    gl.uniform2f(localDeslocamento, projetil.x, projetil.y);
+    gl.uniform2f(localEscala, 0.2, 0.2);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 }
