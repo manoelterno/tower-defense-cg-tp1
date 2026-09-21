@@ -20,8 +20,17 @@ const inimigos = [];
 const projeteis = [];
 let tempoParaSpawn = 0;
 let tempoParaTiro = 0;
+let pontuacao = 0;
 
 function mouseMexeu(evento) {}
+
+function pontuacaoAtualizada() {
+  pontuacao = pontuacao + 50;
+  const elementoPontuacao = document.getElementById('score-display');
+  if (elementoPontuacao) {
+    elementoPontuacao.textContent = `Pontuação: ${pontuacao}`;
+  }
+}
 
 function audioTiro(){
   const som = new Audio('assets/audio/tiro.wav');
@@ -333,11 +342,13 @@ function atualizaLogica(quantoPassou) {
 
       if (distancia < 0.1) {
         // Colisão detectada: remove o projétil
+
         projeteis.splice(i, 1);
 
         // Marca o inimigo como morto e inicia o tempo de 1 segundo deitado
         inimigo.morto = true;
         inimigo.tempoMorte = 1.0;
+        pontuacaoAtualizada(); // Atualiza a pontuação ao abater um inimigo
         break; // O projétil foi destruído, encerra a busca para este projétil
       }
     }
