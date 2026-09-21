@@ -3,6 +3,9 @@ let logoAntes = 0;
 let texFundo = null;
 let texTorre = null;
 let texInimigo = null;
+let texInimigoTop = null;
+let texInimigoMorte = null;
+let texInimigoMorteDown = null;
 let texProjetil = null;
 let localDeslocamento = null;
 let localEscala = null;
@@ -44,7 +47,7 @@ function mouseClicou(evento) {
       y: torre.y,
       dirX: dx / dist,
       dirY: dy / dist,
-      velocidade: 1.5 // Projétil do jogador é rápido e responsivo
+      velocidade: 1 // Projétil do jogador é rápido e responsivo
     });
   }
 }
@@ -170,6 +173,9 @@ void main() {
   texFundo = carregarTextura(glContext, 'assets/fundo.png');
   texTorre = carregarTextura(glContext, 'assets/torre.png');
   texInimigo = carregarTextura(glContext, 'assets/soldier.png');
+  texInimigoTop = carregarTextura(glContext, 'assets/soldier_top.png');
+  texInimigoMorte = carregarTextura(glContext, 'assets/soldier_die.png');
+  texInimigoMorteDown = carregarTextura(glContext, 'assets/soldier_die_down.png');
   texProjetil = carregarTextura(glContext, 'assets/projetil.png');
 
   // 5. Inicia valores de estado
@@ -224,30 +230,36 @@ function atualizaLogica(quantoPassou) {
 
     let x = 0;
     let y = 0;
+    let tipo = 'esquerda';
     const borda = Math.floor(Math.random() * 4);
 
     switch (borda) {
-      case 0: // Centro da Borda Superior (metade da largura)
+      case 0: // Centro da Borda Superior (descendo para a torre)
         x = 0.0;
         y = 1.1;
+        tipo = 'topo';
         break;
-      case 1: // Centro da Borda Inferior (metade da largura)
+      case 1: // Centro da Borda Inferior (subindo para a torre)
         x = 0.0;
         y = -1.1;
+        tipo = 'baixo';
         break;
-      case 2: // Centro da Borda Esquerda (metade da altura)
+      case 2: // Centro da Borda Esquerda (indo da esquerda para a torre)
         x = -1.1;
         y = 0.0;
+        tipo = 'esquerda';
         break;
-      case 3: // Centro da Borda Direita (metade da altura)
+      case 3: // Centro da Borda Direita (indo da direita para a torre)
         x = 1.1;
         y = 0.0;
+        tipo = 'direita';
         break;
     }
 
     inimigos.push({
       x: x,
       y: y,
+      tipo: tipo,
       velocidade: 0.3 // Velocidade em unidades NDC por segundo
     });
   }
@@ -255,6 +267,7 @@ function atualizaLogica(quantoPassou) {
   // 2. Movimentação vetorial dos inimigos em direção à torre (0, 0)
   for (let i = 0; i < inimigos.length; i++) {
     const inimigo = inimigos[i];
+    if (inimigo.morto) continue; // Inimigo abatido fica deitado e não se move
 
     // Vetor direção do inimigo até a torre
     const dx = torre.x - inimigo.x;
@@ -286,16 +299,32 @@ function atualizaLogica(quantoPassou) {
       continue;
     }
 
-    // 5. Detecção de colisão em formato de círculo (raio de colisão < 0.1)
+    // Detecção de colisão em formato de círculo (raio de colisão < 0.1)
     for (let j = inimigos.length - 1; j >= 0; j--) {
       const inimigo = inimigos[j];
+      if (inimigo.morto) continue; // Não atinge inimigos que já estão morrendo
+
       const distancia = Math.hypot(p.x - inimigo.x, p.y - inimigo.y);
 
       if (distancia < 0.1) {
-        // Colisão detectada: remove o projétil e o inimigo dos respectivos arrays
+        // Colisão detectada: remove o projétil
         projeteis.splice(i, 1);
-        inimigos.splice(j, 1);
+
+        // Marca o inimigo como morto e inicia o tempo de 1 segundo deitado
+        inimigo.morto = true;
+        inimigo.tempoMorte = 1.0;
         break; // O projétil foi destruído, encerra a busca para este projétil
+      }
+    }
+  }
+
+  // 4. Temporizador de desaparecimento dos inimigos mortos (1 segundo deitado)
+  for (let i = inimigos.length - 1; i >= 0; i--) {
+    const inimigo = inimigos[i];
+    if (inimigo.morto) {
+      inimigo.tempoMorte -= quantoPassou;
+      if (inimigo.tempoMorte <= 0) {
+        inimigos.splice(i, 1);
       }
     }
   }
@@ -320,12 +349,75 @@ function desenhaCena(gl) {
   gl.uniform2f(localEscala, 1.0, 1.0);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-  // 3) Todos os inimigos do array
-  gl.bindTexture(gl.TEXTURE_2D, texInimigo);
+  // 3) Todos os inimigos do array (vivos ou deitados/mortos)
   for (let i = 0; i < inimigos.length; i++) {
     const inimigo = inimigos[i];
+    let tex = texInimigo;
+    let escalaX = 0.5;
+    let escalaY = 0.5;
+
+    if (inimigo.morto) {
+      // Configuração para o inimigo deitado após tomar o projétil
+      switch (inimigo.tipo) {
+        case 'direita':
+          // Inimigo que vem da borda direita: soldier_die.png
+          tex = texInimigoMorte;
+          escalaX = 0.5;
+          escalaY = 0.5;
+          break;
+        case 'esquerda':
+          // Inimigo que vem da borda esquerda: soldier_die.png invertido horizontalmente
+          tex = texInimigoMorte;
+          escalaX = -0.5;
+          escalaY = 0.5;
+          break;
+        case 'baixo':
+          // Inimigo que vem da borda de baixo: soldier_die_down.png
+          tex = texInimigoMorteDown;
+          escalaX = 0.5;
+          escalaY = 0.5;
+          break;
+        case 'topo':
+          // Inimigo que vem da borda de cima: soldier_die_down.png invertido verticalmente
+          tex = texInimigoMorteDown;
+          escalaX = 0.5;
+          escalaY = -0.5;
+          break;
+      }
+    } else {
+      // Configuração para o inimigo vivo marchando em direção à torre
+      switch (inimigo.tipo) {
+        case 'direita':
+          // Da direita para a torre: soldier.png invertido horizontalmente
+          tex = texInimigo;
+          escalaX = -0.5;
+          escalaY = 0.5;
+          break;
+        case 'topo':
+          // De cima para a torre: soldier_top.png normal
+          tex = texInimigoTop;
+          escalaX = 0.5;
+          escalaY = 0.5;
+          break;
+        case 'baixo':
+          // De baixo para a torre: soldier_top.png invertido verticalmente
+          tex = texInimigoTop;
+          escalaX = 0.5;
+          escalaY = -0.5;
+          break;
+        case 'esquerda':
+        default:
+          // Da esquerda para a torre: soldier.png normal
+          tex = texInimigo;
+          escalaX = 0.5;
+          escalaY = 0.5;
+          break;
+      }
+    }
+
+    gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.uniform2f(localDeslocamento, inimigo.x, inimigo.y);
-    gl.uniform2f(localEscala, 0.5, 0.5);
+    gl.uniform2f(localEscala, escalaX, escalaY);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
