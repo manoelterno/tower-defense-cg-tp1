@@ -227,21 +227,21 @@ function atualizaLogica(quantoPassou) {
     const borda = Math.floor(Math.random() * 4);
 
     switch (borda) {
-      case 0: // Borda Superior
-        x = Math.random() * 2.0 - 1.0;
+      case 0: // Centro da Borda Superior (metade da largura)
+        x = 0.0;
         y = 1.1;
         break;
-      case 1: // Borda Inferior
-        x = Math.random() * 2.0 - 1.0;
+      case 1: // Centro da Borda Inferior (metade da largura)
+        x = 0.0;
         y = -1.1;
         break;
-      case 2: // Borda Esquerda
+      case 2: // Centro da Borda Esquerda (metade da altura)
         x = -1.1;
-        y = Math.random() * 2.0 - 1.0;
+        y = 0.0;
         break;
-      case 3: // Borda Direita
+      case 3: // Centro da Borda Direita (metade da altura)
         x = 1.1;
-        y = Math.random() * 2.0 - 1.0;
+        y = 0.0;
         break;
     }
 
