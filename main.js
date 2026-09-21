@@ -23,6 +23,11 @@ let tempoParaTiro = 0;
 
 function mouseMexeu(evento) {}
 
+function audioTiro(){
+  const som = new Audio('assets/audio/tiro.wav');
+  som.play();
+}
+
 function mouseClicou(evento) {
   const canvas = document.getElementById('gameCanvas') || evento.target;
   const rect = canvas.getBoundingClientRect();
@@ -51,6 +56,7 @@ function mouseClicou(evento) {
       velocidade: 1,
       angulo: Math.atan2(dy, dx) // calcula o ângulo em radianos apontando para o mouse
     });
+    audioTiro();
   }
 }
 
