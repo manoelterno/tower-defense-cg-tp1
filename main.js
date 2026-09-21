@@ -9,6 +9,7 @@ let texInimigoMorteDown = null;
 let texProjetil = null;
 let localDeslocamento = null;
 let localEscala = null;
+let localRotacao = null;
 
 // Variáveis de estado do jogo
 const torre = {
@@ -47,7 +48,8 @@ function mouseClicou(evento) {
       y: torre.y,
       dirX: dx / dist,
       dirY: dy / dist,
-      velocidade: 1 // Projétil do jogador é rápido e responsivo
+      velocidade: 1,
+      angulo: Math.atan2(dy, dx) // calcula o ângulo em radianos apontando para o mouse
     });
   }
 }
@@ -87,15 +89,31 @@ function configuraTudo() {
   // 3. SHADERS ATUALIZADOS PARA SUPORTAR TEXTURAS E TRANSFORMAÇÕES
   const vertexShaderSource = `#version 300 es
 in vec2 a_posicao;
-in vec2 a_coordsTex;     // Coordenadas UV vindas do JS
+in vec2 a_coordsTex;     
 
 uniform vec2 u_deslocamento;
 uniform vec2 u_escala;
+uniform float u_rotacao; // Novo uniform para o ângulo
 
-out vec2 v_coordsTex;    // Passa para o Fragment Shader
+out vec2 v_coordsTex;    
 
 void main() {
-  vec2 posicaoFinal = (a_posicao * u_escala) + u_deslocamento;
+  // 1. Aplica a escala
+  vec2 pos = a_posicao * u_escala;
+  
+  // 2. Calcula seno e cosseno do ângulo
+  float c = cos(u_rotacao);
+  float s = sin(u_rotacao);
+  
+  // 3. Aplica a rotação
+  vec2 posRotacionada = vec2(
+    pos.x * c - pos.y * s,
+    pos.x * s + pos.y * c
+  );
+
+  // 4. Aplica o deslocamento final
+  vec2 posicaoFinal = posRotacionada + u_deslocamento;
+  
   gl_Position = vec4(posicaoFinal, 0.0, 1.0); 
   v_coordsTex = a_coordsTex;
 }`;
@@ -168,6 +186,7 @@ void main() {
   // Resgata a localização dos Uniforms para translação e escala
   localDeslocamento = glContext.getUniformLocation(programa, "u_deslocamento");
   localEscala = glContext.getUniformLocation(programa, "u_escala");
+  localRotacao = glContext.getUniformLocation(programa, "u_rotacao"); 
 
   // CARREGAR AS TEXTURAS USANDO A FUNÇÃO UTILITÁRIA
   texFundo = carregarTextura(glContext, 'assets/fundo.png');
@@ -186,7 +205,7 @@ void main() {
   // Define valores iniciais padrão para não distorcer ou zerar a geometria
   glContext.uniform2f(localDeslocamento, 0.0, 0.0);
   glContext.uniform2f(localEscala, 1.0, 1.0);
-
+  glContext.uniform1f(localRotacao, 0.0); // Inicializa a rotação como 0 para seguir click
   return glContext;
 }
 
@@ -337,6 +356,8 @@ function desenhaCena(gl) {
 
   gl.activeTexture(gl.TEXTURE0);
 
+  gl.uniform1f(localRotacao, 0.0);
+
   // 1) O Fundo (posicionado no centro com escala para cobrir a tela de -1 a 1)
   gl.bindTexture(gl.TEXTURE_2D, texFundo);
   gl.uniform2f(localDeslocamento, 0.0, 0.0);
@@ -427,6 +448,8 @@ function desenhaCena(gl) {
     const projetil = projeteis[i];
     gl.uniform2f(localDeslocamento, projetil.x, projetil.y);
     gl.uniform2f(localEscala, 0.2, 0.2);
+    gl.uniform1f(localRotacao, projetil.angulo); 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
+  gl.uniform1f(localRotacao, 0.0);
 }
