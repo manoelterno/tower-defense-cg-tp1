@@ -10,6 +10,11 @@ let texProjetil = null;
 let localDeslocamento = null;
 let localEscala = null;
 let localRotacao = null;
+let tempoParaSpawn = 0;
+let tempoParaTiro = 0;
+let pontuacao = 0;
+let vida = 100;
+let gameOver = false;
 
 // Variáveis de estado do jogo
 const torre = {
@@ -18,10 +23,7 @@ const torre = {
 };
 const inimigos = [];
 const projeteis = [];
-let tempoParaSpawn = 0;
-let tempoParaTiro = 0;
-let pontuacao = 0;
-let vida = 100;
+
 
 function mouseMexeu(evento) {}
 
@@ -34,10 +36,17 @@ function pontuacaoAtualizada() {
 }
 
 function vidaAtualizada() {
-  vida = vida - 10;
+  vida = Math.max(0, vida - 10);
+
   const elementoVida = document.getElementById('hp-display');
   if (elementoVida) {
     elementoVida.textContent = `Torre HP: ${vida}`;
+  }
+
+  if (vida <= 0) {
+    gameOver = true;
+    const overlay = document.getElementById('game-over');
+    if (overlay) overlay.classList.remove('hidden');
   }
 }
 
@@ -266,6 +275,8 @@ function carregarTextura(gl, url) {
 }
 
 function atualizaLogica(quantoPassou) {
+  if (gameOver) return;
+  
   // 1. Spawner de inimigos nas bordas da tela a cada 2 segundos
   tempoParaSpawn += quantoPassou;
   if (tempoParaSpawn >= 2.0) {

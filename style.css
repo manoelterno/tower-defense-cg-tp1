@@ -31,3 +31,21 @@ canvas {
     pointer-events: none; /* Impede que o texto bloqueie os cliques no canvas */
     text-shadow: 2px 2px 2px #000;
 }
+
+#game-over {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  font-weight: bold;
+  color: white;
+  text-shadow: 0 0 12px rgba(0,0,0,0.8);
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 10;
+}
+
+#game-over.hidden {
+  display: none;
+}
