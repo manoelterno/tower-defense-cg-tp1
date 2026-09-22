@@ -15,6 +15,7 @@ let tempoParaTiro = 0;
 let pontuacao = 0;
 let vida = 100;
 let gameOver = false;
+let musicaFundo = null;
 
 // Variáveis de estado do jogo
 const torre = {
@@ -50,12 +51,27 @@ function vidaAtualizada() {
   }
 }
 
-function audioTiro(){
+function audioTiro() {
   const som = new Audio('assets/audio/tiro.wav');
+  som.volume = 0.6;
   som.play();
 }
 
+function iniciarMusicaFundo() {
+  if (musicaFundo) return;
+
+  musicaFundo = new Audio('assets/audio/soundtrack.ogg');
+  musicaFundo.loop = true;
+  musicaFundo.volume = 0.5;
+
+  musicaFundo.play().catch(() => {
+    console.log('A reprodução da música precisa começar após um clique do usuário.');
+  });
+}
+
 function mouseClicou(evento) {
+  iniciarMusicaFundo();
+
   const canvas = document.getElementById('gameCanvas') || evento.target;
   const rect = canvas.getBoundingClientRect();
 
