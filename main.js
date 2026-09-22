@@ -276,11 +276,11 @@ function carregarTextura(gl, url) {
 
 function atualizaLogica(quantoPassou) {
   if (gameOver) return;
-  
+
   // 1. Spawner de inimigos nas bordas da tela a cada 2 segundos
   tempoParaSpawn += quantoPassou;
-  if (tempoParaSpawn >= 2.0) {
-    tempoParaSpawn -= 2.0;
+  if (tempoParaSpawn >= 0.5) {
+    tempoParaSpawn -= 0.5;
 
     let x = 0;
     let y = 0;
@@ -318,24 +318,37 @@ function atualizaLogica(quantoPassou) {
     });
   }
 
-  // 2. Movimentação vetorial dos inimigos em direção à torre (0, 0)
+  // 2. Movimentação vetorial dos inimigos em direção à torre
   for (let i = 0; i < inimigos.length; i++) {
     const inimigo = inimigos[i];
-    if (inimigo.morto) continue; // Inimigo abatido fica deitado e não se move
+    if (inimigo.morto) continue;
 
-    // Vetor direção do inimigo até a torre
+    let bloqueado = false;
+
+    for (let j = 0; j < inimigos.length; j++) {
+      const outro = inimigos[j];
+      if (!outro.morto) continue;
+
+      const dx = outro.x - inimigo.x;
+      const dy = outro.y - inimigo.y;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist < 0.18) {
+        bloqueado = true;
+        break;
+      }
+    }
+
+    if (bloqueado) continue;
+
     const dx = torre.x - inimigo.x;
     const dy = torre.y - inimigo.y;
-
-    // Distância euclidiana (módulo do vetor)
     const distancia = Math.hypot(dx, dy);
 
-    // Normalização do vetor (apenas se não estiver já na torre)
     if (distancia > 0.001) {
       const dirX = dx / distancia;
       const dirY = dy / distancia;
 
-      // Deslocamento proporcional à velocidade e ao tempo decorrido
       inimigo.x += dirX * inimigo.velocidade * quantoPassou;
       inimigo.y += dirY * inimigo.velocidade * quantoPassou;
     }
