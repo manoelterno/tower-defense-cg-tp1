@@ -17,6 +17,8 @@ let vida = 100;
 let gameOver = false;
 let musicaFundo = null;
 
+let texBomba = null;
+let tempoParaBomba = 0;
 // Variáveis de estado do jogo
 const torre = {
   x: 0.0,
@@ -24,12 +26,13 @@ const torre = {
 };
 const inimigos = [];
 const projeteis = [];
+const bombas = [];
 
 
 function mouseMexeu(evento) {}
 
-function pontuacaoAtualizada() {
-  pontuacao = pontuacao + 50;
+function pontuacaoAtualizada(valor) {
+  pontuacao = pontuacao + valor;
   const elementoPontuacao = document.getElementById('score-display');
   if (elementoPontuacao) {
     elementoPontuacao.textContent = `Pontuação: ${pontuacao}`;
@@ -54,6 +57,12 @@ function vidaAtualizada() {
 function audioTiro() {
   const som = new Audio('assets/audio/tiro.wav');
   som.volume = 0.6;
+  som.play();
+}
+
+function audioExplosao() {
+  const som = new Audio('assets/audio/explosao.wav');
+  som.volume = 0.7;
   som.play();
 }
 
@@ -84,6 +93,32 @@ function mouseClicou(evento) {
   // Eixo Y: [0, rect.height] -> [1, -1] (inverte o eixo Y pois no WebGL +1 é o topo e -1 é a base)
   const ndcX = (pixelX / rect.width) * 2.0 - 1.0;
   const ndcY = 1.0 - (pixelY / rect.height) * 2.0;
+
+  //2.5 Verifica colisão com bombas: se o clique estiver dentro do raio de uma bomba, explode a bomba e mata todos os inimigos
+  for (let i = bombas.length - 1; i >= 0; i--) {
+    const bomba = bombas[i];
+    const dx = ndcX - bomba.x;
+    const dy = ndcY - bomba.y;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist < bomba.raio + 0.08) {
+      let totalMortos = 0;
+      // Explode a bomba
+      for (let j = 0; j < inimigos.length; j++) {
+        const inimigo = inimigos[j];
+        if (!inimigo.morto) {
+          inimigo.morto = true;
+          inimigo.tempoMorte = 0.5;
+          totalMortos++;
+        }
+      }
+
+      pontuacaoAtualizada(totalMortos * 50); // Atualiza a pontuação ao explodir a bomba
+      bombas.splice(i, 1);
+      audioExplosao();
+      return;
+    }
+  }
 
   // 3. Disparo manual do jogador: cria um projétil que sai da torre em direção ao ponto clicado
   const dx = ndcX - torre.x;
@@ -245,6 +280,7 @@ void main() {
   texInimigoMorte = carregarTextura(glContext, 'assets/soldier_die.png');
   texInimigoMorteDown = carregarTextura(glContext, 'assets/soldier_die_down.png');
   texProjetil = carregarTextura(glContext, 'assets/projetil.png');
+  texBomba = carregarTextura(glContext, 'assets/bomb.png');
 
   // 5. Inicia valores de estado
   glContext.clearColor(0.2, 0.2, 0.2, 1); 
@@ -295,6 +331,8 @@ function atualizaLogica(quantoPassou) {
 
   // 1. Spawner de inimigos nas bordas da tela a cada 2 segundos
   tempoParaSpawn += quantoPassou;
+  tempoParaBomba += quantoPassou;
+
   if (tempoParaSpawn >= 0.5) {
     tempoParaSpawn -= 0.5;
 
@@ -332,6 +370,29 @@ function atualizaLogica(quantoPassou) {
       tipo: tipo,
       velocidade: 0.3 // Velocidade em unidades NDC por segundo
     });
+  }
+
+  if (tempoParaBomba >= 1.0) {
+    tempoParaBomba = 0.0;
+
+    // 10% de chance por segundo
+    if (Math.random() < 0.10) {
+      const x = (Math.random() * 1.8) - 0.9; // entre -0.9 e 0.9
+      const y = (Math.random() * 1.8) - 0.9;
+
+      bombas.push({
+        x,
+        y,
+        raio: 0.12
+      });
+    }
+  }
+
+  for (let i = bombas.length - 1; i >= 0; i--) {
+    bombas[i].tempoVida = (bombas[i].tempoVida || 0) + quantoPassou;
+    if (bombas[i].tempoVida > 6.0) {
+      bombas.splice(i, 1);
+    }
   }
 
   // 2. Movimentação vetorial dos inimigos em direção à torre
@@ -415,7 +476,7 @@ function atualizaLogica(quantoPassou) {
         // Marca o inimigo como morto e inicia o tempo de 1 segundo deitado
         inimigo.morto = true;
         inimigo.tempoMorte = 1.0;
-        pontuacaoAtualizada(); // Atualiza a pontuação ao abater um inimigo
+        pontuacaoAtualizada(50); // Atualiza a pontuação ao abater um inimigo
         break; // O projétil foi destruído, encerra a busca para este projétil
       }
     }
@@ -526,6 +587,15 @@ function desenhaCena(gl) {
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
+  //3.5) Bombas (posicionadas aleatoriamente na tela)
+  gl.bindTexture(gl.TEXTURE_2D, texBomba);
+  for (let i = 0; i < bombas.length; i++) {
+    const bomba = bombas[i];
+    gl.uniform2f(localDeslocamento, bomba.x, bomba.y);
+    gl.uniform2f(localEscala, 0.3, 0.3);
+    gl.uniform1f(localRotacao, 0.0);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+  }
   // 4) Todos os projéteis do array
   gl.bindTexture(gl.TEXTURE_2D, texProjetil);
   for (let i = 0; i < projeteis.length; i++) {
