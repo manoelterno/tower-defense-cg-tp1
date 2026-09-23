@@ -10,6 +10,13 @@ let texProjetil = null;
 let localDeslocamento = null;
 let localEscala = null;
 let localRotacao = null;
+let texTorreDentro1 = null;
+let texTorreDentro2 = null;
+let texTorreDentro3 = null;
+let texSoldadoAtual = null;
+let flipXSoldado = 1;
+let flipYSoldado = 1;
+let anguloTorre = 0; 
 let tempoParaSpawn = 0;
 let tempoParaTiro = 0;
 let pontuacao = 0;
@@ -29,7 +36,28 @@ const projeteis = [];
 const bombas = [];
 
 
-function mouseMexeu(evento) {}
+function mouseMexeu(evento) {
+  const canvas = document.getElementById('gameCanvas') || evento.target;
+  const rect = canvas.getBoundingClientRect();
+  const ndcX = ((evento.clientX - rect.left) / rect.width) * 2.0 - 1.0;
+  const ndcY = 1.0 - ((evento.clientY - rect.top) / rect.height) * 2.0;
+
+  let anguloGraus = Math.atan2(ndcY - torre.y, ndcX - torre.x) * 180 / Math.PI;
+  if (anguloGraus < 0) anguloGraus += 360;
+
+  flipXSoldado = (anguloGraus > 90 && anguloGraus < 270) ? -1 : 1;
+  flipYSoldado = (anguloGraus > 180) ? -1 : 1;
+
+  // dobra o ângulo pra faixa 0-90 conforme o quadrante
+  let ref = anguloGraus;
+  if (flipXSoldado === -1 && flipYSoldado === 1) ref = 180 - anguloGraus;
+  else if (flipXSoldado === -1 && flipYSoldado === -1) ref = anguloGraus - 180;
+  else if (flipXSoldado === 1 && flipYSoldado === -1) ref = 360 - anguloGraus;
+
+  if (ref <= 30) texSoldadoAtual = texTorreDentro1;
+  else if (ref <= 60) texSoldadoAtual = texTorreDentro2;
+  else texSoldadoAtual = texTorreDentro3;
+}
 
 function pontuacaoAtualizada(valor) {
   pontuacao = pontuacao + valor;
@@ -281,6 +309,10 @@ void main() {
   texInimigoMorteDown = carregarTextura(glContext, 'assets/soldier_die_down.png');
   texProjetil = carregarTextura(glContext, 'assets/projetil.png');
   texBomba = carregarTextura(glContext, 'assets/bomb.png');
+  texTorreDentro1 = carregarTextura(glContext, 'assets/torre-dentro-1.png');
+  texTorreDentro2 = carregarTextura(glContext, 'assets/torre-dentro-2.png');
+  texTorreDentro3 = carregarTextura(glContext, 'assets/torre-dentro-3.png');
+  texSoldadoAtual = texTorreDentro1;
 
   // 5. Inicia valores de estado
   glContext.clearColor(0.2, 0.2, 0.2, 1); 
@@ -605,5 +637,10 @@ function desenhaCena(gl) {
     gl.uniform1f(localRotacao, projetil.angulo); 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
+
+  gl.bindTexture(gl.TEXTURE_2D, texSoldadoAtual);
+  gl.uniform2f(localDeslocamento, torre.x, torre.y);
+  gl.uniform2f(localEscala, 0.5 * flipXSoldado, 0.5 * flipYSoldado);
   gl.uniform1f(localRotacao, 0.0);
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
