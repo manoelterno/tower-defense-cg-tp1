@@ -39,24 +39,36 @@ const bombas = [];
 function mouseMexeu(evento) {
   const canvas = document.getElementById('gameCanvas') || evento.target;
   const rect = canvas.getBoundingClientRect();
+
   const ndcX = ((evento.clientX - rect.left) / rect.width) * 2.0 - 1.0;
   const ndcY = 1.0 - ((evento.clientY - rect.top) / rect.height) * 2.0;
 
-  let anguloGraus = Math.atan2(ndcY - torre.y, ndcX - torre.x) * 180 / Math.PI;
-  if (anguloGraus < 0) anguloGraus += 360;
+  const dx = ndcX - torre.x;
+  const dy = ndcY - torre.y;
+  const anguloGraus = Math.atan2(dy, dx) * 180 / Math.PI;
 
-  flipXSoldado = (anguloGraus > 90 && anguloGraus < 270) ? -1 : 1;
-  flipYSoldado = (anguloGraus > 180) ? -1 : 1;
-
-  // dobra o ângulo pra faixa 0-90 conforme o quadrante
-  let ref = anguloGraus;
-  if (flipXSoldado === -1 && flipYSoldado === 1) ref = 180 - anguloGraus;
-  else if (flipXSoldado === -1 && flipYSoldado === -1) ref = anguloGraus - 180;
-  else if (flipXSoldado === 1 && flipYSoldado === -1) ref = 360 - anguloGraus;
-
-  if (ref <= 30) texSoldadoAtual = texTorreDentro1;
-  else if (ref <= 60) texSoldadoAtual = texTorreDentro2;
-  else texSoldadoAtual = texTorreDentro3;
+  // 4 direções puras
+  if (anguloGraus >= -45 && anguloGraus < 45) {
+    // direita
+    flipXSoldado = 1;
+    flipYSoldado = 1;
+    texSoldadoAtual = texTorreDentro1;
+  } else if (anguloGraus >= 45 && anguloGraus < 135) {
+    // cima
+    flipXSoldado = 1;
+    flipYSoldado = 1;
+    texSoldadoAtual = texTorreDentro3;
+  } else if (anguloGraus >= 135 || anguloGraus < -135) {
+    // esquerda
+    flipXSoldado = -1;
+    flipYSoldado = 1;
+    texSoldadoAtual = texTorreDentro1;
+  } else {
+    // baixo
+    flipXSoldado = 1;
+    flipYSoldado = -1;
+    texSoldadoAtual = texTorreDentro3;
+  }
 }
 
 function pontuacaoAtualizada(valor) {
